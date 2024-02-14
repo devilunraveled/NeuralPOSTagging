@@ -1,0 +1,2 @@
+class Config :
+    modelSavePath = "./checkpoints/"
