@@ -27,27 +27,9 @@ class Model :
         except :
             return -1
 
-    # Training and Testing Related Functionality
-    def train(self) :
-        pass
-
     def test(self) :
         pass
 
     # Evaluation Related Functionality
     def getEvaluationResults(self) :
         pass
-
-    # Hyperparameter Related Functionality
-    def getHyperParameters(self) :
-        pass
-
-    def setHyperParameters(self) :
-        pass
-
-    # Printing Related Functionality
-    def __str__(self) :
-        raise NotImplementedError
-
-    def __repr__(self) :
-        raise NotImplementedError

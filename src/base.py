@@ -34,3 +34,9 @@ class DataPoint :
 
     def __str__(self):
         return str(self.dataPoint)
+
+
+def OneHotEncoding(totalSize, index) :
+    oneHotEncoding = [0] * totalSize
+    oneHotEncoding[index] = 1
+    return oneHotEncoding
