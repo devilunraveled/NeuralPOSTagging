@@ -17,6 +17,9 @@ class Sentence :
         self.partition = self.id.split(".")[-1]
         self.original = information.get("text", "")
         self.POStags = information.get("POS", [])
+    
+    def getTokensWithLabels(self):
+        return list(zip(self.original.split(" "), self.POStags))
 
     def __str__(self):
         text = f"{Color.YELLOW}Sentence ID : {self.id}{Color.END}\n"
@@ -24,3 +27,10 @@ class Sentence :
             text += f"{Color.CYAN}{token:<12.10} {Color.BOLD}{Color.GREEN}{POStag:<8.4}{Color.END} \n"
 
         return text
+
+class DataPoint :
+    def __init__(self, dataPoint):
+        self.dataPoint = [token[0] for token in dataPoint]
+
+    def __str__(self):
+        return str(self.dataPoint)

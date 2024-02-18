@@ -14,6 +14,8 @@ class DataHandler :
         self.dataFileName = dataFileName
         self.dataFilePath = Config.dataPath + self.dataFileName
         
+        self.vocab = set(Config.specialTokens)
+
         self.data = {}
 
     def loadDataset(self, printSentences = False) :
@@ -25,6 +27,8 @@ class DataHandler :
             
             for sent in Conllu.parse_incr(file):
                 sentenceInformation['POS'] = [token['upos'] for token in sent]
+                self.vocab.update( [token['form'] for token in sent] )
+                
                 self.data[sent.metadata['sent_id']] = Sentence(sentenceInformation | sent.metadata )
                 
                 if printSentences :
@@ -36,6 +40,7 @@ class DataHandler :
         except Exception as e :
             print(e)
             return -1
+
 
 if __name__ == "__main__" :
     dataHandler = DataHandler("sample.conllu")
