@@ -3,16 +3,40 @@
     pre-processing required for the dataset
     before passing it to the model.
 """
+from io import open
+import conllu as Conllu
+
+from config import Config
+from base import Sentence
 
 class DataHandler :
-    def __init__(self) :
-        pass
+    def __init__(self, dataFileName : str) :
+        self.dataFileName = dataFileName
+        self.dataFilePath = Config.dataPath + self.dataFileName
+        
+        self.data = {}
 
-    def loadDataset(self) :
-        pass
-    
-    def preprocessDataset(self) :
-        pass
+    def loadDataset(self, printSentences = False) :
+        try :
+            self.data = {}
+            file = open(self.dataFilePath, "r", encoding="utf-8", errors='ignore')
+            
+            sentenceInformation = {}
+            
+            for sent in Conllu.parse_incr(file):
+                sentenceInformation['POS'] = [token['upos'] for token in sent]
+                self.data[sent.metadata['sent_id']] = Sentence(sentenceInformation | sent.metadata )
+                
+                if printSentences :
+                    print(self.data[sent.metadata['sent_id']])
 
-    def __str__(self) -> str:
-        raise NotImplementedError
+            sentenceInformation.clear()
+            
+            file.close()
+        except Exception as e :
+            print(e)
+            return -1
+
+if __name__ == "__main__" :
+    dataHandler = DataHandler("sample.conllu")
+    dataHandler.loadDataset()
