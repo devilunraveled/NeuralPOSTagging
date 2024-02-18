@@ -3,16 +3,12 @@
     class for all the models in this assignment.
 """
 import pickle
-
-from dataHandler import DataHandler
 from config import Config
 
 class Model :
-    def __init__(self, dataHandler : DataHandler) :
-        self.dataHandler = dataHandler
-        self.modelName = "Model"
+    def __init__(self, modelName = None) :
+        self.modelName = "Model" if modelName is None else modelName
         self.modelFileName = Config.modelSavePath + self.modelName
-        pass
 
     # Model Reusability Related Functionality
     def saveModel(self):
@@ -41,7 +37,6 @@ class Model :
     # Evaluation Related Functionality
     def getEvaluationResults(self) :
         pass
-
 
     # Hyperparameter Related Functionality
     def getHyperParameters(self) :
