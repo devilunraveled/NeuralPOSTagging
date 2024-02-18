@@ -8,7 +8,7 @@ from dataHandler import DataHandler
 from config import Config
 
 class Model :
-    def __init__(self, dataHandler : DataHandler,  ) :
+    def __init__(self, dataHandler : DataHandler) :
         self.dataHandler = dataHandler
         self.modelName = "Model"
         self.modelFileName = Config.modelSavePath + self.modelName
@@ -49,15 +49,6 @@ class Model :
 
     def setHyperParameters(self) :
         pass
-
-    
-    # Dataset Related Functionality
-    def getDataset(self) :
-        pass
-
-    def setDataset(self):
-        pass
-
 
     # Printing Related Functionality
     def __str__(self) :
