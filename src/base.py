@@ -100,5 +100,6 @@ class DataPoint :
 
 def OneHotEncoding(totalSize, index) :
     oneHotEncoding = [0] * totalSize
-    oneHotEncoding[index] = 1
+    if index < totalSize :
+        oneHotEncoding[index] = 1
     return oneHotEncoding

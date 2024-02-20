@@ -145,6 +145,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                  futureContextSize : int = Config.futureContextSize, numHiddenLayers : int = Config.hiddenLayers.__len__(), 
                  hiddenLayerSize : list = Config.hiddenLayers, device = torch.device('cpu'), startOver = False) :
         
+        
         modelName += f"_{previousContextSize=}_{futureContextSize=}_n={numHiddenLayers}"
         for i in range(numHiddenLayers) :
             modelName += f"_{hiddenLayerSize[i]}"
@@ -264,7 +265,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             
             evaluation = Evaluator(allPredictions, allActuals)
             
-            evaluation.plot_confusion_matrix()
+            # evaluation.plot_confusion_matrix()
             return evaluation
         except Exception as e:
             import traceback
