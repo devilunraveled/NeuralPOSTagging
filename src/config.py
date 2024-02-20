@@ -1,5 +1,6 @@
 class Config :
     modelSavePath = "../checkpoints/"
+    plotSavePath = "../plots/"
     fileFormat = ".conllu"
     trainTag = "-train"
     testTag = "-test"

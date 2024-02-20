@@ -70,7 +70,7 @@ class Evaluator :
         uniqueLabels = np.unique(self.groundTruth + self.prediction)
         classLabels = [label for label in uniqueLabels]
 
-        sns.heatmap(cm, annot=True, fmt=fmt, xticklabels=classLabels, yticklabels=classLabels)
+        sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues', xticklabels=classLabels, yticklabels=classLabels, vmin=0, vmax=200)
         plt.xlabel('Predicted Labels')
         plt.ylabel('True Labels')
         plt.title('Confusion Matrix')
