@@ -5,10 +5,12 @@ import torch.optim as optim
 
 from model import Model
 from dataHandler import DataHandler
-from base import Sentence, DataPoint, OneHotEncoding
+from base import Evaluator, Sentence, DataPoint, OneHotEncoding
 from config import Config
 
 from alive_progress import alive_bar
+
+EmbeddingSize = 866
 
 class FeedForwardNeuralNetworkDataset(Dataset) :
     def __init__(self, dataPoints):
@@ -20,7 +22,7 @@ class FeedForwardNeuralNetworkDataset(Dataset) :
 
     def __getitem__(self, index):
         input, label = self.dataPoints[index].getDataLabelPair()
-        return torch.tensor(input, dtype=torch.float), torch.tensor(label, dtype=torch.float32)
+        return torch.tensor(input, dtype=torch.float), torch.tensor(label, dtype=torch.float)
 
 class FeedForwardNeuralNetworkDataPoint(DataPoint) :
     def __init__(self, dataPoint, lookUp : dict, position, vocabSize) :
@@ -34,10 +36,11 @@ class FeedForwardNeuralNetworkDataPoint(DataPoint) :
             dataPointEmbedding = []
 
             for token in self.dataPoint[0]:
-                tokenIndex = self.getTokenIndex[token]
-                dataPointEmbedding.extend( [1 if i == tokenIndex else 0 for i in range(self.vocabSize)] )
+                tokenIndex = self.getTokenIndex.get(token, 0)
+                # O corresponds to unknown tokens repsresented as `<unknown>`
+                dataPointEmbedding.extend( OneHotEncoding(self.vocabSize, tokenIndex) )
+                # dataPointEmbedding.extend( [1 if i == tokenIndex else 0 for i in range(self.vocabSize)] )
 
-            # print(f"{self.dataPoint=} \n {dataPointEmbedding=}\n")
             return dataPointEmbedding
         except Exception as e:
             print(e)
@@ -59,8 +62,11 @@ class FeedForwardNeuralNetworkDataHandler(DataHandler) :
         self.previousContextSize = previousContextSize
         self.futureContextSize = futureContextSize
 
-    def createRawDataPointsFromSentence(self, sentence):
+    def createRawDataPointsFromSentence(self, sentence, new = False):
         try :
+            if new :
+                dataPoints = []
+
             assert isinstance(sentence, Sentence)
             sentenceTags = sentence.getTokensWithLabels()
 
@@ -85,13 +91,22 @@ class FeedForwardNeuralNetworkDataHandler(DataHandler) :
 
     def createRawDataPoints(self):
         try :
-            self.rawDataPoints = []
+            self.rawTrainDataPoints = []
+            self.rawTestDataPoints = []
+            self.rawValidationDataPoints = []
+
             self.loadDataset()
 
-            for sentence in self.data.values():
-                self.rawDataPoints.extend(self.createRawDataPointsFromSentence(sentence))
+            for sentence in self.trainData.values():
+                self.rawTrainDataPoints.extend(self.createRawDataPointsFromSentence(sentence))
+            
+            for sentence in self.testData.values():
+                self.rawTestDataPoints.extend(self.createRawDataPointsFromSentence(sentence))
 
-            return self.rawDataPoints
+            for sentence in self.validationData.values():
+                self.rawValidationDataPoints.extend(self.createRawDataPointsFromSentence(sentence))
+
+            return self.rawTrainDataPoints, self.rawTestDataPoints, self.rawValidationDataPoints
         except Exception as e:
             print(e)
             return []
@@ -101,37 +116,53 @@ class FeedForwardNeuralNetworkDataHandler(DataHandler) :
             self.createRawDataPoints()
             self.createLookUpTable()
 
-            self.dataPoint = []
+            self.trainDataPoints = []
+            self.testDataPoints = []
+            self.validationDataPoints = []
 
-            for rawDataPoint in self.rawDataPoints:
-                newDataPoint = FeedForwardNeuralNetworkDataPoint( dataPoint=rawDataPoint, lookUp=self.lookUpTable, position=self.previousContextSize, vocabSize=len(self.vocab))
-                self.dataPoint.append( newDataPoint )
+            for rawTrainDataPoint in self.rawTrainDataPoints:
+                newDataPoint = FeedForwardNeuralNetworkDataPoint( dataPoint=rawTrainDataPoint, lookUp=self.lookUpTable, position=self.previousContextSize, vocabSize=len(self.vocab))
+                self.trainDataPoints.append( newDataPoint )
+            
+            for rawTestDataPoint in self.rawTestDataPoints:
+                newDataPoint = FeedForwardNeuralNetworkDataPoint( dataPoint=rawTestDataPoint, lookUp=self.lookUpTable, position=self.previousContextSize, vocabSize=len(self.vocab))
+                self.testDataPoints.append( newDataPoint )
+            
+            for rawValidationDataPoint in self.rawValidationDataPoints:
+                newDataPoint = FeedForwardNeuralNetworkDataPoint( dataPoint=rawValidationDataPoint, lookUp=self.lookUpTable, position=self.previousContextSize, vocabSize=len(self.vocab))
+                self.validationDataPoints.append( newDataPoint )
 
-            return self.dataPoint
+            return self.trainDataPoints
 
         except Exception as e:
             print(e)
             return []
 
-    def createLookUpTable(self):
-        try:
-            self.lookUpTable = {}
-
-            for index, token in enumerate(self.vocab):
-                self.lookUpTable[token] = index
-
-        except Exception as E:
-            print(E)
-            return -1
 
 
 class FeedForwardNeuralNetwork(nn.Module, Model) :
     def __init__(self, modelName : str, previousContextSize : int = Config.previousContextSize, 
-                 futureContextSize : int = Config.futureContextSize, numHiddenLayers : int = 1, 
-                 hiddenLayerSize : list = [64], vocabSize : int = 866) :
+                 futureContextSize : int = Config.futureContextSize, numHiddenLayers : int = Config.hiddenLayers.__len__(), 
+                 hiddenLayerSize : list = Config.hiddenLayers, device = torch.device('cpu'), startOver = False) :
         
+        modelName += f"_{previousContextSize=}_{futureContextSize=}_n={numHiddenLayers}"
+        for i in range(numHiddenLayers) :
+            modelName += f"_{hiddenLayerSize[i]}"
+
         Model.__init__(self,modelName=modelName)
         nn.Module.__init__(self)
+        
+        if not startOver :
+            try :
+                resp = self.loadModel()
+                if resp == 1 :
+                    return 
+            except :
+                pass
+
+
+        self.device = device
+        print(f"Using {self.device}")
         
         self.previousContextSize = previousContextSize
         self.futureContextSize = futureContextSize
@@ -140,93 +171,187 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
         self.hiddenLayerSize = hiddenLayerSize
 
         self.numClasses = len(Config.classLabels)
-        self.inputSize = vocabSize*(self.previousContextSize + self.futureContextSize + 1)
+        self.inputSize = EmbeddingSize*(self.previousContextSize + self.futureContextSize + 1)
 
-        self.fc1 = nn.Linear(self.inputSize, self.hiddenLayerSize[0])
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(self.hiddenLayerSize[0], self.numClasses)
-        self.softmax = nn.Softmax(dim = 1)
+        self.layer = nn.ModuleList()
+        
+        for i in range (self.numHiddenLayers + 1) :
+            if i == 0 :
+                self.layer.append(nn.Linear(self.inputSize, self.hiddenLayerSize[i]))
+            elif i == self.numHiddenLayers :
+                self.layer.append(nn.Linear(self.hiddenLayerSize[-1], self.numClasses))
+            else :
+                self.layer.append(nn.Linear(self.hiddenLayerSize[i-1], self.hiddenLayerSize[i]))
 
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.parameters(), lr=0.01)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.005)
     
-    def forward(self, input):
-        x = self.fc1(input)
-        x = self.relu(x)
-        x = self.fc2(x)
-        x = self.softmax(x)
+        self.trained = False
+    def forward(self, x):
+        for i in range(self.numHiddenLayers + 1):
+            x = self.layer[i](x)
+            if i != self.numHiddenLayers :
+                x = self.relu(x)
         return x
 
-    def trainModel(self, dataLoader, numEpochs):
+    def trainModel(self, numEpochs):
         try:
-            try :
-                resp = self.loadModel()
-                if resp == 1 :
-                    return 1
-            except :
-                pass
-
-            with alive_bar(len(dataLoader)*numEpochs) as bar:
-                for epoch in range(numEpochs):
-                    runningLoss = 0.0
-                    for inputs, labels in dataLoader:
-                        inputs, labels = inputs.to(device), labels.to(device)
-                        # Zero the parameter gradients
-                        self.optimizer.zero_grad()
-
+            if self.trained :
+                return 
+            
+            for epoch in range(numEpochs):
+                runningLoss = 0.0
+                with alive_bar(len(self.trainData)) as bar:
+                    for inputs, labels in self.trainData:
+                        inputs, labels = inputs.to(self.device), labels.to(self.device)
                         # Forward pass
                         outputs = self(inputs)
                         loss = self.criterion(outputs, labels)
 
-                        # Backward pass and optimization
+                        self.optimizer.zero_grad()
                         loss.backward()
                         self.optimizer.step()
 
                         # Print statistics
                         runningLoss += loss.item()
                         bar()
-                    # Print average loss for the epoch
-                    avg_loss = runningLoss / len(dataLoader)
-                    print(f'Epoch [{epoch+1}/{numEpochs}], Average Loss: {avg_loss:.4f}')
+                
+                # Print average loss for the epoch
+                avg_loss = runningLoss / len(self.trainData)
+                print(f'Epoch [{epoch+1}/{numEpochs}], Average Loss: {avg_loss:.4f}')
+
+                if epoch > 0 and epoch % Config.validationFrequency == 1 :
+                    self.evaluateModel(validation = True)
 
             print('Training completed successfully')
+            self.trained = True
             self.saveModel()
             return 1
         except Exception as e:
             raise(e)
-            return -1
         
-    def evaluateModel(self, data):
+    def evaluateModel(self, validation = False, test = False):
         try :
-            # X = torch.tensor(data[0], dtype=torch.float32)
-            # Y = torch.tensor(data[1], dtype=torch.float32)
-            accuracy = 0 
-            for X,Y in data :
-                X, Y = X.to(device), Y.to(device)
-                outputs = self(X)
-                predicted = torch.argmax(outputs, 1)
-                accuracy += (predicted == Y).sum().item() / Y.size(0)
-                
-            print(f'Accuracy: {accuracy/len(data):.4f}')
+            if validation is True :
+                data = self.validationData
+            elif test is True :
+                data = self.testData
+            else :
+                data = self.trainData
+
+            accuracy = 0
+            batchSize = 0
+            allPredictions = []
+            allActuals = []
+
+            with alive_bar(len(data)) as bar:
+                for X,Y in data :
+                    if batchSize == 0 :
+                        batchSize = X.shape[0]
+                    X, Y = X.to(self.device), Y.to(self.device)
+                    outputs = self(X)
+
+                    predicted = torch.argmax(outputs, dim = 1)
+                    actual = torch.argmax(Y, dim = 1)
+                    
+
+                    allPredictions.extend([Config.classes[predictedValue] for predictedValue in predicted.flatten().tolist()])
+                    allActuals.extend([Config.classes[actualValue] for actualValue in actual.flatten().tolist()])
+
+                    accuracy += (predicted == actual).sum().item()
+                    bar()
+            
+            evaluation = Evaluator(allPredictions, allActuals)
+            
+            evaluation.plot_confusion_matrix()
+            return evaluation
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            raise(e)
+    
+    def completeEvaluation(self):
+        try:
+            results = {}
+            results['Train'] = self.evaluateModel()
+            results['Validation'] = self.evaluateModel(validation = True)
+            results['Test'] = self.evaluateModel(test = True)
+
+            return results
+        except Exception as e:
+            print(e)
+            return {}
+    
+    def prepareData(self):
+        try :
+            if hasattr(self, 'dataHandler') :
+                return 1
+
+            self.dataHandler = FeedForwardNeuralNetworkDataHandler("en_atis-ud")
+            self.dataHandler.getDataPoints()
+            
+            self.trainDataSet = FeedForwardNeuralNetworkDataset(self.dataHandler.trainDataPoints)
+            self.testDataSet = FeedForwardNeuralNetworkDataset(self.dataHandler.testDataPoints)
+            self.validationDataSet = FeedForwardNeuralNetworkDataset(self.dataHandler.validationDataPoints)
+
+            self.trainData = DataLoader(self.trainDataSet, batch_size=Config.miniBatchSize, shuffle=True)
+            self.testData = DataLoader(self.testDataSet, batch_size=Config.miniBatchSize, shuffle=False)
+            self.validationData = DataLoader(self.validationDataSet, batch_size=Config.miniBatchSize, shuffle=False)
+        except Exception as e:
+            print(e)
+            return
+        
+    def inference(self, sentence):
+        try :
+            self.prepareData()
+            
+            if self.trained is False :
+                self.trainModel(numEpochs = Config.epochs)
+            
+            information = {}
+            information['sent_id'] = "1.inference"
+            information['text'] = sentence
+            information['POS'] = ['X' for _ in range(len(sentence.split(" ")))]
+
+            sentence = Sentence(information)
+            sentenceRawDataPoints = self.dataHandler.createRawDataPointsFromSentence(sentence)
+            
+            dataPoints = []
+
+            for rawDataPoint in sentenceRawDataPoints :
+                dataPoints.append(FeedForwardNeuralNetworkDataPoint(rawDataPoint, self.dataHandler.lookUpTable, Config.previousContextSize, len(self.dataHandler.vocab)))
+
+            inferenceDataSet = FeedForwardNeuralNetworkDataset(dataPoints)
+            inferenceData = DataLoader(inferenceDataSet, shuffle=False)
+            
+            prediction = []
+            with torch.no_grad():
+                for X,_ in inferenceData :
+                    X = X.to(self.device)
+                    outputs = self(X)
+                    predicted = torch.argmax(outputs, dim = 1)
+                    prediction.append(Config.classes[predicted[0]])
+
+            information['POS'] = prediction
+            
+            sentence = Sentence(information)
+
+            print(sentence)
+
         except Exception as e:
             raise(e)
-            return -1
-
+            return {}
 if __name__ == "__main__":
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model = FeedForwardNeuralNetwork("SimpleANN", device = device).to(device)
+    model.prepareData()
+    model.trainModel(numEpochs = Config.epochs)
+    results = model.completeEvaluation()
     
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Using {device=}")
+    # print(f"{'Parition':<10}|{'Accuracy':<9}(%)")
+    # for key in results :
+    #     print(f"{key:<10}|{results[key]*100:<9.2f}%")
 
-    trainDataHandler = FeedForwardNeuralNetworkDataHandler("en_atis-ud-train.conllu")
-    trainDataSet = FeedForwardNeuralNetworkDataset(trainDataHandler.getDataPoints())
-    
-    testDataHandler = FeedForwardNeuralNetworkDataHandler("en_atis-ud-train.conllu")
-    testDataSet = FeedForwardNeuralNetworkDataset(testDataHandler.getDataPoints())
-
-    miniBatchSize = Config.miniBatchSize
-    trainDataLoader = DataLoader(trainDataSet, batch_size=miniBatchSize, shuffle=True)
-    testDataLoader = DataLoader(testDataSet, shuffle=True)
-
-    model = FeedForwardNeuralNetwork("sampleModel").to(device)
-    model.trainModel(dataLoader = trainDataLoader, numEpochs = Config.epochs)
-    model.evaluateModel(testDataLoader)
+    # sentence = input("Enter Sentence : ")
+    # model.inference(sentence)

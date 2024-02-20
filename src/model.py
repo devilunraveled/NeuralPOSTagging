@@ -10,25 +10,24 @@ class Model :
         self.modelName = "Model" if modelName is None else modelName
         self.modelFileName = Config.modelSavePath + self.modelName
 
-    # Model Reusability Related Functionality
+    def test(self) :
+        pass
+    
     def saveModel(self):
         try :
-            pickle.dump(self, open(self.modelFileName, "wb"))
+            pickle.dump(self, open(self.modelFileName + Config.fileFormat, "wb"))
             return 1
         except :
             return -1
     
     def loadModel(self):
         try :
-            loaded_model = pickle.load(open(self.modelFileName, "rb"))
+            loaded_model = pickle.load(open(self.modelFileName + Config.fileFormat, "rb"))
             self.__dict__.update(loaded_model.__dict__)
             print(f"Model Loaded from {self.modelFileName} Successfully!")
             return 1
         except :
             return -1
-
-    def test(self) :
-        pass
 
     # Evaluation Related Functionality
     def getEvaluationResults(self) :
