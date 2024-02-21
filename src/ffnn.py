@@ -348,11 +348,11 @@ if __name__ == "__main__":
     model = FeedForwardNeuralNetwork("SimpleANN", device = device).to(device)
     model.prepareData()
     model.trainModel(numEpochs = Config.epochs)
-    results = model.completeEvaluation()
+    # results = model.completeEvaluation()
     
     # print(f"{'Parition':<10}|{'Accuracy':<9}(%)")
     # for key in results :
     #     print(f"{key:<10}|{results[key]*100:<9.2f}%")
 
-    # sentence = input("Enter Sentence : ")
-    # model.inference(sentence)
+    sentence = input("Enter Sentence : ")
+    model.inference(sentence)

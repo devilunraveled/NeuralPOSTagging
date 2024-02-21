@@ -57,24 +57,27 @@ class Evaluator :
         average = "micro" if average is None else average
         return recall_score(self.groundTruth, self.prediction, average = average)
 
-    def plot_confusion_matrix(self, normalize = True):
-        cm = self.getConfusionMatrix()
-        fmt = 'd'
-        if normalize:
-            # Normalize the confusion matrix
-            cm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis]*(0.001))
-            fmt = '.2f'  # Format for displaying normalized values
+    def plot_confusion_matrix(self, normalize = False):
+        try :
+            cm = self.getConfusionMatrix()
+            fmt = 'd'
+            if normalize:
+                # Normalize the confusion matrix
+                cm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis]*(0.001))
+                fmt = '.2f'  # Format for displaying normalized values
 
-        plt.figure(figsize=(10, 8))
+            plt.figure(figsize=(10, 8))
 
-        uniqueLabels = np.unique(self.groundTruth + self.prediction)
-        classLabels = [label for label in uniqueLabels]
+            uniqueLabels = np.unique(self.groundTruth + self.prediction)
+            classLabels = [label for label in uniqueLabels]
 
-        sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues', xticklabels=classLabels, yticklabels=classLabels, vmin=0, vmax=200)
-        plt.xlabel('Predicted Labels')
-        plt.ylabel('True Labels')
-        plt.title('Confusion Matrix')
-        plt.show()
+            sns.heatmap(cm, annot=True, fmt=fmt, cmap='Blues', xticklabels=classLabels, yticklabels=classLabels, vmin=0, vmax=200)
+            plt.xlabel('Predicted Labels')
+            plt.ylabel('True Labels')
+            plt.title('Confusion Matrix')
+            plt.show()
+        except RuntimeError as e :
+            print(e)
 
     def __call__(self):
         metrics = {
@@ -82,11 +85,8 @@ class Evaluator :
             "Precision" : self.getPrecision(),
             "F1Score" : self.getF1Score(),
             "Recall" : self.getRecall(),
-            "ConfusionMatrix" : self.getConfusionMatrix()
         }
         
-        self.plot_confusion_matrix()
-
         return metrics
      
     
@@ -102,4 +102,6 @@ def OneHotEncoding(totalSize, index) :
     oneHotEncoding = [0] * totalSize
     if index < totalSize :
         oneHotEncoding[index] = 1
+    else :
+        print("Error in OneHotEncoding function")
     return oneHotEncoding

@@ -31,25 +31,37 @@ class ReccurentNeuralNetworkDataset(Dataset):
 
 class ReccurentNeuralNetworkDataPoint(DataPoint):
     def __init__(self, dataPoint, lookUp : dict, vocabSize) :
-        self.dataPoint = [token[0] for token in dataPoint],[OneHotEncoding(len(Config.classLabels),Config.classLabels[label[1]]) for label in dataPoint]
+        self.dataPoint = [token[0] for token in dataPoint], [token[1] for token in dataPoint]
         self.getTokenIndex = lookUp
         self.vocabSize = vocabSize
 
-    def getEmbedding(self):
+    def getDataEmbedding(self):
         try :
             dataPointEmbedding = []
 
             for token in self.dataPoint[0]:
                 tokenIndex = self.getTokenIndex.get(token, 0)
-                dataPointEmbedding.extend( OneHotEncoding(self.vocabSize, tokenIndex) )
+                dataPointEmbedding.append( OneHotEncoding(self.vocabSize, tokenIndex) )
 
             return dataPointEmbedding
         except Exception as e:
             print(e)
             return []
 
+    def getLabelEmbedding(self):
+        try:
+            labelEmbedding = []
+
+            for label in self.dataPoint[1]:
+                labelEmbedding.append( OneHotEncoding(Config.classLabels.__len__(), Config.classLabels[label]) )
+
+            return labelEmbedding
+        except Exception as e:
+            print(e)
+            return []
+
     def getDataLabelPair(self):
-        return self.getEmbedding(), self.dataPoint[1]
+        return self.getDataEmbedding(), self.getLabelEmbedding()
 
 class ReccurentNeuralNetworkDataHandler(DataHandler):
     def __init__(self, dataFileName : str) -> None:
@@ -79,8 +91,8 @@ class ReccurentNeuralNetworkDataHandler(DataHandler):
             return []
 
 class ReccurentNeuralNetwork(nn.Module, Model):
-    def __init__(self, modelName : str, recurrenceDepth : int = Config.recurrenceDepth, startOver : bool = False, stackSize : int = Config.stackSize, inputSize = EmbeddingSize ) :
-        modelName += f"_n={recurrenceDepth}"
+    def __init__(self, modelName : str, startOver : bool = False, stackSize : int = Config.stackSize, inputSize = EmbeddingSize, device = None, nonLinearity : str = 'tanh', bidirectionality = False ) :
+        modelName += f"_n={stackSize}"
 
         Model.__init__(self,modelName=modelName)
         nn.Module.__init__(self)
@@ -93,41 +105,60 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             except :
                 pass
 
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.to(self.device)
+        if device is None :
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            print(f"Using {self.device}")
+        else :
+            self.device = device
 
         self.inputSize = inputSize
         self.stackSize = stackSize
         self.hiddenStateSize = Config.hiddenStateSize
-        
-        self.RNN = nn.RNN(input_size=self.inputSize, device = self.device, hidden_size=self.hiddenStateSize, batch_first=True)
+        self.nonLinearity = nonLinearity
+        self.bidirectionality = bidirectionality
+
+        self.RNN = nn.RNN(input_size=self.inputSize, device = self.device, hidden_size=self.hiddenStateSize, 
+                            num_layers=self.stackSize, nonlinearity=self.nonLinearity,bidirectional=self.bidirectionality, 
+                            batch_first=True)
 
         self.criterion = nn.CrossEntropyLoss()
-        self.optimizer = optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = optim.Adam(self.parameters(), lr=0.003)
         
+        self.fc = nn.Linear(self.hiddenStateSize, len(Config.classLabels))
+        
+        self.softmax = nn.Softmax(dim=1)
+
         self.trained = False
     
+        self.to(self.device)
+
+    def initializeHiddenState(self, batchSize):
+        return torch.zeros(self.stackSize*(1+self.bidirectionality), batchSize, self.hiddenStateSize, requires_grad=True).to(self.device)
+
     def forward(self, x):
         batchSize = x.shape[0]
-        hiddenState = self.init_hidden(batchSize)
-        out, _ = self.RNN(x, hiddenState)
+        self.hiddenState = self.initializeHiddenState(batchSize).to(self.device)
+        out, _ = self.RNN(x, self.hiddenState)
+        out = self.fc(out)
+        out = self.softmax(out) 
+        # print(f"{out.shape=}")
         return out
 
     def trainModel(self, numEpochs : int = 10):
         try :
             if self.trained :
                 return
-
+            
             for epoch in range(numEpochs) :
                 runningLoss = 0.0
                 with alive_bar(len(self.trainData)) as bar :
                     for inputs, labels in self.trainData :
                         inputs, labels = inputs.to(self.device), labels.to(self.device)
-                        
 
-                        outputs = self(inputs)
+                        outputs = self(inputs)        
+                        # print(f"{outputs.shape=}, {labels.shape=}")
                         loss = self.criterion(outputs, labels)
-                        
+
                         self.optimizer.zero_grad()
                         loss.backward()
                         self.optimizer.step()
@@ -136,7 +167,7 @@ class ReccurentNeuralNetwork(nn.Module, Model):
                         bar()
 
                 averageLoss = runningLoss / len(self.trainData)
-                print(f"Epoch : [{epoch + 1/numEpochs}] | Loss : {averageLoss:.4f}")
+                print(f"Epoch : [{epoch + 1} | {numEpochs}] | Loss : {averageLoss:.4f}")
             
                 if epoch > 0 and epoch % Config.validationFrequency == 1 :
                     self.evaluateModel(validation = True)
@@ -145,11 +176,10 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             self.trained = True
             self.saveModel()
             return 1
-        except Exception as e:
+        except Exception:
             import traceback
             print(traceback.format_exc())
-            raise(e)
-        
+            return -1
     def prepareData(self) :
         try :
             if hasattr(self, 'dataHandler') :
@@ -167,8 +197,6 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             print("Initialized Datasets...")
             print("Loading the data")
             
-            print(f"{len(self.trainDataSet)=} | {len(self.validationDataSet)=} | {len(self.testDataSet)=}")
-
             self.trainData = DataLoader(self.trainDataSet, batch_size=Config.miniBatchSize, shuffle=True, collate_fn=self.customCollate)
             self.validationData = DataLoader(self.validationDataSet, batch_size=Config.miniBatchSize, shuffle = False, collate_fn=self.customCollate)
             self.testData = DataLoader(self.testDataSet, batch_size=Config.miniBatchSize, shuffle = False, collate_fn=self.customCollate)
@@ -188,32 +216,42 @@ class ReccurentNeuralNetwork(nn.Module, Model):
                 data = self.trainData
 
             batchSize = 0
+            
             allPredictions = []
             allActuals = []
-
             with alive_bar(len(data)) as bar :
-                for inputs, labels in data :
-                    if batchSize == 0 :
+                with torch.no_grad():
+                    for inputs, labels in data :
+                        if batchSize == 0 :
+                            batchSize = inputs.shape[0]
+                        
+                        inputs, labels = inputs.to(self.device), labels.to(self.device)
                         batchSize = inputs.shape[0]
-                    inputs, labels = inputs.to(self.device), labels.to(self.device)
-                    batchSize = inputs.shape[0]
 
-                    outputs = self(inputs)
+                        outputs = self(inputs)
+                        
+                        for i, label in enumerate(labels):
+                            for j, oneHotVector in enumerate(label):
+                                maxIndex = torch.argmax(oneHotVector).item()
+                                maxValue = label[j][int(maxIndex)]
 
-                    predicted = torch.argmax(outputs, dim=1)
-                    actual = torch.argmax(labels, dim=1)
+                                if maxValue.item() == 0.0 :
+                                    continue
 
-                    allPredictions.extend([Config.classes[predictedValue] for predictedValue in predicted.flatten().tolist()])
-                    allActuals.extend([Config.classes[actualValue] for actualValue in actual.flatten().tolist()])
-                    bar()
+                                allActuals.append(Config.classes[int(maxIndex)] )
+                                allPredictions.append(Config.classes[int(torch.argmax(outputs[i][j]))])
+
+                        bar()
 
             evaluation = Evaluator(allPredictions, allActuals)
 
+            print(evaluation())
             evaluation.plot_confusion_matrix()
             return evaluation
 
-        except Exception as e :
-            print(e)
+        except Exception:
+            import traceback
+            print(traceback.format_exc())
             return
 
     def completeEvaluation(self):
@@ -265,19 +303,19 @@ class ReccurentNeuralNetwork(nn.Module, Model):
 
     def customCollate(self, batch):
         # Sort the batch by sequence length in descending order
-        batch = sorted(batch, key=lambda x: x[0].shape[0], reverse=True)
+        batch = sorted(batch, key=lambda x: x[0].shape[1], reverse=False)
         # Extract sequences and labels from the batch
         sequences, labels = zip(*batch)
         # Pad sequences to the length of the longest sequence
         padded_sequences = nn.utils.rnn.pad_sequence(sequences, batch_first=True)
-        # Convert labels to a tensor
-        labels = torch.stack(labels)
-        return padded_sequences, labels
+        # Pad labels to the length of the longest sequence
+        padded_labels = nn.utils.rnn.pad_sequence(labels, batch_first=True)
+        return padded_sequences, padded_labels
 
 if __name__ == "__main__":
-    model = ReccurentNeuralNetwork(modelName="SimpleRNN")
+    model = ReccurentNeuralNetwork(modelName="SimpleRNN", startOver=False, bidirectionality = False)
     model.prepareData()
     model.trainModel(numEpochs = Config.epochs)
     results = model.completeEvaluation()
 
-    print(results)
+    # print(results)
