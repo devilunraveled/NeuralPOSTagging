@@ -5,17 +5,18 @@
 """
 
 from alive_progress import alive_bar
-from model import Model
-from config import Config
-from base import Sentence, DataPoint,OneHotEncoding, Evaluator
-from dataHandler import DataHandler
+
+from src.model import Model
+from src.config import RNNConfig as Config
+from src.base import Sentence, DataPoint,OneHotEncoding, Evaluator
+from src.dataHandler import DataHandler
 
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
 import torch.optim as optim
 import torch
 
-from ffnn import EmbeddingSize
+from src.ffnn import EmbeddingSize
 
 class ReccurentNeuralNetworkDataset(Dataset):
     def __init__(self, dataPoints) -> None:
@@ -91,8 +92,37 @@ class ReccurentNeuralNetworkDataHandler(DataHandler):
             return []
 
 class ReccurentNeuralNetwork(nn.Module, Model):
-    def __init__(self, modelName : str, startOver : bool = False, stackSize : int = Config.stackSize, inputSize = EmbeddingSize, device = None, nonLinearity : str = 'tanh', bidirectionality = False ) :
+    def __init__(self, modelName : str, startOver : bool = False, stackSize : int = Config.stackSize, inputSize = EmbeddingSize, device = None, nonLinearity : str = 'tanh', bidirectionality = False, hiddenLayers : list = Config.hiddenLayers, hiddenStateSize : int = Config.hiddenStateSize, miniBatchSize : int = Config.miniBatchSize ) :
+        
+        ### Static Variables, can be used for model naming.
+        self.numClasses = len(Config.classLabels)
+        self.hiddenLayerSize = hiddenLayers
+        self.numHiddenLayers = len(self.hiddenLayerSize)
+        self.inputSize = inputSize
+        self.stackSize = stackSize
+        self.hiddenStateSize = hiddenStateSize
+        self.nonLinearity = nonLinearity
+        self.bidirectionality = bidirectionality
+        self.miniBatchSize = miniBatchSize
+
+        if device is None :
+            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+            print(f"Using {self.device}")
+        else :
+            self.device = device
+
+        ### Constructing Model's name
         modelName += f"_n={stackSize}"
+        modelName += f"_h={self.hiddenStateSize}"
+        
+        if bidirectionality :
+            modelName += "_bidirectional"
+
+        modelName += "_nonLinearity="+nonLinearity
+        
+        modelName += f"_layers={self.numHiddenLayers}"
+        for layerSize in self.hiddenLayerSize :
+            modelName += f"_l={layerSize}"
 
         Model.__init__(self,modelName=modelName)
         nn.Module.__init__(self)
@@ -105,17 +135,6 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             except :
                 pass
 
-        if device is None :
-            self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-            print(f"Using {self.device}")
-        else :
-            self.device = device
-
-        self.inputSize = inputSize
-        self.stackSize = stackSize
-        self.hiddenStateSize = Config.hiddenStateSize
-        self.nonLinearity = nonLinearity
-        self.bidirectionality = bidirectionality
 
         self.RNN = nn.RNN(input_size=self.inputSize, device = self.device, hidden_size=self.hiddenStateSize, 
                             num_layers=self.stackSize, nonlinearity=self.nonLinearity,bidirectional=self.bidirectionality, 
@@ -123,26 +142,37 @@ class ReccurentNeuralNetwork(nn.Module, Model):
 
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.parameters(), lr=0.003)
-        
-        self.fc = nn.Linear(self.hiddenStateSize, len(Config.classLabels))
-        
+        self.relu = nn.ReLU()
+
+        self.layers = nn.ModuleList()
+        for i in range (self.numHiddenLayers + 1) :
+            if i == 0 :
+                self.layers.append(nn.Linear(self.hiddenStateSize*( 1 + self.bidirectionality), self.hiddenLayerSize[i]))
+            elif i == self.numHiddenLayers :
+                self.layers.append(nn.Linear(self.hiddenLayerSize[-1], self.numClasses))
+            else :
+                self.layers.append(nn.Linear(self.hiddenLayerSize[i-1], self.hiddenLayerSize[i]))
         self.softmax = nn.Softmax(dim=1)
 
         self.trained = False
-    
-        self.to(self.device)
 
+        self.to(self.device)
+    
     def initializeHiddenState(self, batchSize):
-        return torch.zeros(self.stackSize*(1+self.bidirectionality), batchSize, self.hiddenStateSize, requires_grad=True).to(self.device)
+        return torch.zeros(self.stackSize*(1+self.bidirectionality), batchSize, self.hiddenStateSize).to(self.device)
 
     def forward(self, x):
         batchSize = x.shape[0]
         self.hiddenState = self.initializeHiddenState(batchSize).to(self.device)
-        out, _ = self.RNN(x, self.hiddenState)
-        out = self.fc(out)
-        out = self.softmax(out) 
-        # print(f"{out.shape=}")
-        return out
+        x, _ = self.RNN(x, self.hiddenState)
+       
+        for i in range(self.numHiddenLayers + 1):
+            x = self.layers[i](x)
+            if i != self.numHiddenLayers :
+                x = self.relu(x)
+            else :
+                x = self.softmax(x)
+        return x
 
     def trainModel(self, numEpochs : int = 10):
         try :
@@ -197,9 +227,9 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             print("Initialized Datasets...")
             print("Loading the data")
             
-            self.trainData = DataLoader(self.trainDataSet, batch_size=Config.miniBatchSize, shuffle=True, collate_fn=self.customCollate)
-            self.validationData = DataLoader(self.validationDataSet, batch_size=Config.miniBatchSize, shuffle = False, collate_fn=self.customCollate)
-            self.testData = DataLoader(self.testDataSet, batch_size=Config.miniBatchSize, shuffle = False, collate_fn=self.customCollate)
+            self.trainData = DataLoader(self.trainDataSet, batch_size=self.miniBatchSize, shuffle=True, collate_fn=self.customCollate)
+            self.validationData = DataLoader(self.validationDataSet, batch_size=self.miniBatchSize, shuffle = False, collate_fn=self.customCollate)
+            self.testData = DataLoader(self.testDataSet, batch_size=self.miniBatchSize, shuffle = False, collate_fn=self.customCollate)
 
             print(f"Data Loaded Successfully")
         except Exception as e:
@@ -217,6 +247,8 @@ class ReccurentNeuralNetwork(nn.Module, Model):
 
             batchSize = 0
             
+            self.RNN.flatten_parameters()
+
             allPredictions = []
             allActuals = []
             with alive_bar(len(data)) as bar :
@@ -246,7 +278,7 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             evaluation = Evaluator(allPredictions, allActuals)
 
             print(evaluation())
-            evaluation.plot_confusion_matrix()
+            # evaluation.plot_confusion_matrix()
             return evaluation
 
         except Exception:
@@ -272,24 +304,25 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             if self.trained is False :
                 self.trainModel(numEpochs = Config.epochs)
             
+            self.RNN.flatten_parameters()
             information = {}
             information['sent_id'] = "1.inference"
             information['text'] = sentence
             information['POS'] = ['X' for _ in range(len(sentence.split(" ")))]
 
             sentence = Sentence(information)
-            dataPoint = self.dataHandler.createDataPointFromSentence(sentence)
             
-            inferenceDataSet = ReccurentNeuralNetworkDataset(dataPoint)
-            inferenceData = DataLoader(inferenceDataSet, shuffle=False)
-            
-            prediction = []
             with torch.no_grad():
+                dataPoint = self.dataHandler.createDataPointFromSentence(sentence)
+                
+                inferenceDataSet = ReccurentNeuralNetworkDataset([dataPoint])
+                inferenceData = DataLoader(inferenceDataSet, shuffle=False)
+                prediction = []
                 for X,_ in inferenceData :
                     X = X.to(self.device)
                     outputs = self(X)
-                    predicted = torch.argmax(outputs, dim = 1)
-                    prediction.append(Config.classes[predicted] for predicted in predicted.flatten().tolist())
+                    predicted = torch.argmax(outputs, dim = -1)
+                    prediction.extend([Config.classes[pred] for pred in predicted.flatten().tolist()])
 
             information['POS'] = prediction
             
@@ -313,9 +346,12 @@ class ReccurentNeuralNetwork(nn.Module, Model):
         return padded_sequences, padded_labels
 
 if __name__ == "__main__":
-    model = ReccurentNeuralNetwork(modelName="SimpleRNN", startOver=False, bidirectionality = False)
+    model = ReccurentNeuralNetwork(modelName="SimpleRNN", startOver=False, bidirectionality = True)
     model.prepareData()
     model.trainModel(numEpochs = Config.epochs)
     results = model.completeEvaluation()
-
+    
+    # sentence = "I am a flight"
+    # sentence = input("Enter Sentence : ")
+    # model.inference(sentence)
     # print(results)

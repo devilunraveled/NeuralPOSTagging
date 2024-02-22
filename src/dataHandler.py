@@ -6,8 +6,8 @@
 from io import open
 import conllu as Conllu
 
-from config import Config
-from base import Sentence
+from src.config import Config
+from src.base import Sentence
 
 class DataHandler :
     def __init__(self, dataFileName : str) :

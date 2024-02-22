@@ -3,10 +3,10 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
 import torch.optim as optim
 
-from model import Model
-from dataHandler import DataHandler
-from base import Evaluator, Sentence, DataPoint, OneHotEncoding
-from config import Config
+from src.model import Model
+from src.dataHandler import DataHandler
+from src.base import Evaluator, Sentence, DataPoint, OneHotEncoding
+from src.config import ANNConfig as Config
 
 from alive_progress import alive_bar
 
@@ -145,8 +145,20 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                  futureContextSize : int = Config.futureContextSize, numHiddenLayers : int = Config.hiddenLayers.__len__(), 
                  hiddenLayerSize : list = Config.hiddenLayers, device = torch.device('cpu'), startOver = False) :
         
+        self.device = device
+        print(f"Using {self.device}")
         
-        modelName += f"_{previousContextSize=}_{futureContextSize=}_n={numHiddenLayers}"
+        self.previousContextSize = previousContextSize
+        self.futureContextSize = futureContextSize
+        
+        self.numHiddenLayers = numHiddenLayers
+        self.hiddenLayerSize = hiddenLayerSize
+
+        self.numClasses = len(Config.classLabels)
+        self.inputSize = EmbeddingSize*(self.previousContextSize + self.futureContextSize + 1)
+
+        
+        modelName += f"_p={previousContextSize}_s={futureContextSize}_n={numHiddenLayers}"
         for i in range(numHiddenLayers) :
             modelName += f"_{hiddenLayerSize[i]}"
 
@@ -162,18 +174,6 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                 pass
 
 
-        self.device = device
-        print(f"Using {self.device}")
-        
-        self.previousContextSize = previousContextSize
-        self.futureContextSize = futureContextSize
-        
-        self.numHiddenLayers = numHiddenLayers
-        self.hiddenLayerSize = hiddenLayerSize
-
-        self.numClasses = len(Config.classLabels)
-        self.inputSize = EmbeddingSize*(self.previousContextSize + self.futureContextSize + 1)
-
         self.relu = nn.ReLU()
         self.layer = nn.ModuleList()
         
@@ -187,8 +187,11 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
 
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.parameters(), lr=0.005)
-    
+
         self.trained = False
+        
+        self.to(self.device)
+
     def forward(self, x):
         for i in range(self.numHiddenLayers + 1):
             x = self.layer[i](x)
@@ -200,6 +203,9 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
         try:
             if self.trained :
                 return 
+            
+            if not hasattr(self, 'dataHandler') :
+                self.prepareData()
             
             for epoch in range(numEpochs):
                 runningLoss = 0.0
@@ -265,6 +271,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             
             evaluation = Evaluator(allPredictions, allActuals)
             
+            print(evaluation())
             # evaluation.plot_confusion_matrix()
             return evaluation
         except Exception as e:
@@ -321,7 +328,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             dataPoints = []
 
             for rawDataPoint in sentenceRawDataPoints :
-                dataPoints.append(FeedForwardNeuralNetworkDataPoint(rawDataPoint, self.dataHandler.lookUpTable, Config.previousContextSize, len(self.dataHandler.vocab)))
+                dataPoints.append(FeedForwardNeuralNetworkDataPoint(rawDataPoint, self.dataHandler.lookUpTable, self.previousContextSize, len(self.dataHandler.vocab)))
 
             inferenceDataSet = FeedForwardNeuralNetworkDataset(dataPoints)
             inferenceData = DataLoader(inferenceDataSet, shuffle=False)
@@ -345,14 +352,14 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             return {}
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = FeedForwardNeuralNetwork("SimpleANN", device = device).to(device)
+    model = FeedForwardNeuralNetwork("SimpleANN", device = device)
     model.prepareData()
     model.trainModel(numEpochs = Config.epochs)
-    # results = model.completeEvaluation()
+    results = model.completeEvaluation()
     
     # print(f"{'Parition':<10}|{'Accuracy':<9}(%)")
     # for key in results :
     #     print(f"{key:<10}|{results[key]*100:<9.2f}%")
 
-    sentence = input("Enter Sentence : ")
-    model.inference(sentence)
+    # sentence = input("Enter Sentence : ")
+    # model.inference(sentence)

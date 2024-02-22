@@ -46,16 +46,16 @@ class Evaluator :
         return accuracy_score(self.groundTruth, self.prediction, normalize = True)
 
     def getPrecision(self, average = None) :
-        average = "micro" if average is None else average
-        return precision_score(self.groundTruth, self.prediction, average = average)
+        average = "weighted" if average is None else average
+        return precision_score(self.groundTruth, self.prediction, average = average, zero_division=0.0)
 
     def getF1Score(self, average = None) :
-        average = "micro" if average is None else average
-        return f1_score(self.groundTruth, self.prediction, average = average)
+        average = "weighted" if average is None else average
+        return f1_score(self.groundTruth, self.prediction, average = average, zero_division=0.0)
     
     def getRecall(self, average = None) :
-        average = "micro" if average is None else average
-        return recall_score(self.groundTruth, self.prediction, average = average)
+        average = "weighted" if average is None else average
+        return recall_score(self.groundTruth, self.prediction, average = average, zero_division=0.0)
 
     def plot_confusion_matrix(self, normalize = False):
         try :
