@@ -1,52 +1,70 @@
 from src.ffnn import FeedForwardNeuralNetwork
-from src.model import Model
+from src.rnn import ReccurentNeuralNetwork
 
 class PerformanceEvaluation:
-    def __init__(self, model : Model, parameters : list[dict]) -> None:
-        assert isinstance(model, Model)
-        self.model = model
+    def __init__(self, parameters : list[dict]) -> None:
         self.parameters = parameters
         self.evaluations = {}
+        self.models = []
 
     def runEvaluations(self) -> None:
         for params in self.parameters :
-            self.model.setParams(**params)
-            self.model.setNNParams()
-            self.model.trainModel()
-            self.evaluations[self.model.modelName] = self.model.completeEvaluation()
-
+            model = ReccurentNeuralNetwork(**params)
+            self.models.append(model)
+            model.prepareData()
+            model.trainModel()
+            self.evaluations[model.modelName] = model.completeEvaluation()
 
 def getParamsFFNN():
     params = []
-
-    params.append({
-        "previousContextSize" : 1,
-        "futureContextSize" : 1,
-        "numHiddenLayers" : 1,
-        "hiddenLayerSize" : [64],
-        "modelName" : "EvaluationFFNN-1",
-    })
-
-    params.append({
-        "previousContextSize" : 2,
-        "futureContextSize" : 2,
-        "numHiddenLayers" : 1,
-        "hiddenLayerSize" : [64],
-        "modelName" : "EvaluationFFNN-2",
-    })
-
-    params.append({
-        "previousContextSize" : 3,
-        "futureContextSize" : 3,
-        "numHiddenLayers" : 1,
-        "hiddenLayerSize" : [64],
-        "modelName" : "EvaluationFFNN-3",
-    })
     
+    possibleS = [0,1,2,3,4]
+    possibleP = [0,1,2,3,4]
+    possibleHiddenLayerSizes = [ [32], [64], [128],
+                             [32, 32], [64, 64],
+                             [64, 32], [128, 64],
+                             [128, 64, 32] ]
+
+    for s in possibleS :
+        for p in possibleP :
+            for hiddenLayerSize in possibleHiddenLayerSizes :
+                params.append({
+                    "previousContextSize" : p,
+                    "futureContextSize" : s,
+                    "hiddenLayerSize" : hiddenLayerSize,
+                    "modelName" : f"EvaluationFFNN-p={p}_s={s}_n={len(hiddenLayerSize)}",
+                })
+
+    return params
+
+def getParamsRNN():
+    params = []
+
+    possibleStackSize = [1,2,3]
+    possibleHiddenLayerSizes = [ [32], [64], [128],
+                             [32, 32], [64, 64],
+                             [64, 32], [128, 64],
+                             [128, 64, 32] ]
+    possibleHiddenStateSizes = [ 64, 128, 256 ]
+    possibleBidirectionality = [True, False]
+    
+    for stackSize in possibleStackSize :
+        for hiddenLayerSize in possibleHiddenLayerSizes :
+            for hiddenStateSize in possibleHiddenStateSizes :
+                for bidirectionality in possibleBidirectionality :
+                    params.append({
+                        "stackSize" : stackSize,
+                        "hiddenLayers" : hiddenLayerSize,
+                        "hiddenStateSize" : hiddenStateSize,
+                        "bidirectionality" : bidirectionality,
+                        "modelName" : f"EvaluationRNN-s={stackSize}_h={len(hiddenLayerSize)}_b={bidirectionality}_l={hiddenStateSize}",
+                    })
+
     return params
 
 if __name__ == "__main__":
-    sampleFNN = FeedForwardNeuralNetwork("EvaluationANN")
+    # ffnnEval = PerformanceEvaluation(getParamsFFNN())
+    # ffnnEval.runEvaluations()
 
-    ffnnEval = PerformanceEvaluation(FeedForwardNeuralNetwork("ffnn"), getParamsFFNN())
-    ffnnEval.runEvaluations()
+    rnnEval = PerformanceEvaluation(getParamsRNN())
+    rnnEval.runEvaluations()

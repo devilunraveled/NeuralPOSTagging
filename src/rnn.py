@@ -8,7 +8,7 @@ from alive_progress import alive_bar
 
 from src.model import Model
 from src.config import RNNConfig as Config
-from src.base import Sentence, DataPoint,OneHotEncoding, Evaluator
+from src.base import Sentence, DataPoint,OneHotEncoding, Evaluator, plotDevAccuracy, plotTrainLoss
 from src.dataHandler import DataHandler
 
 from torch.utils.data import DataLoader, Dataset
@@ -92,7 +92,10 @@ class ReccurentNeuralNetworkDataHandler(DataHandler):
             return []
 
 class ReccurentNeuralNetwork(nn.Module, Model):
-    def __init__(self, modelName : str, startOver : bool = False, stackSize : int = Config.stackSize, inputSize = EmbeddingSize, device = None, nonLinearity : str = 'tanh', bidirectionality = False, hiddenLayers : list = Config.hiddenLayers, hiddenStateSize : int = Config.hiddenStateSize, miniBatchSize : int = Config.miniBatchSize ) :
+    def __init__(self, modelName : str, startOver : bool = False, stackSize : int = Config.stackSize, 
+                 inputSize = EmbeddingSize, device = None, nonLinearity : str = 'tanh', bidirectionality = False, 
+                 hiddenLayers : list = Config.hiddenLayers, hiddenStateSize : int = Config.hiddenStateSize, 
+                 miniBatchSize : int = Config.miniBatchSize ) :
         
         ### Static Variables, can be used for model naming.
         self.numClasses = len(Config.classLabels)
@@ -104,6 +107,9 @@ class ReccurentNeuralNetwork(nn.Module, Model):
         self.nonLinearity = nonLinearity
         self.bidirectionality = bidirectionality
         self.miniBatchSize = miniBatchSize
+        
+        self.modelLoss = []
+        self.modelDevAccuracy = []
 
         if device is None :
             self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -197,10 +203,11 @@ class ReccurentNeuralNetwork(nn.Module, Model):
                         bar()
 
                 averageLoss = runningLoss / len(self.trainData)
+                self.modelLoss.append(averageLoss)
                 print(f"Epoch : [{epoch + 1} | {numEpochs}] | Loss : {averageLoss:.4f}")
             
-                if epoch > 0 and epoch % Config.validationFrequency == 1 :
-                    self.evaluateModel(validation = True)
+                validationMetric = self.evaluateModel(validation = True)
+                self.modelDevAccuracy.append(validationMetric)
 
             print('Training completed successfully')
             self.trained = True
@@ -209,7 +216,7 @@ class ReccurentNeuralNetwork(nn.Module, Model):
         except Exception:
             import traceback
             print(traceback.format_exc())
-            return -1
+            return None
     def prepareData(self) :
         try :
             if hasattr(self, 'dataHandler') :
@@ -278,7 +285,8 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             evaluation = Evaluator(allPredictions, allActuals)
 
             print(evaluation())
-            # evaluation.plot_confusion_matrix()
+            if data == self.testData :
+                evaluation.plot_confusion_matrix(fileName = self.modelName)
             return evaluation
 
         except Exception:
@@ -292,6 +300,9 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             results['Train'] = self.evaluateModel()
             results['Validation'] = self.evaluateModel(validation = True)
             results['Test'] = self.evaluateModel(test = True)
+            
+            plotDevAccuracy(fileName = self.modelName, devAccuracy = self.modelDevAccuracy)
+            plotTrainLoss(fileName = self.modelName, trainLoss = self.modelLoss)
 
             return results
         except Exception as e:

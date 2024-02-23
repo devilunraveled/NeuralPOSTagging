@@ -5,7 +5,7 @@ import torch.optim as optim
 
 from src.model import Model
 from src.dataHandler import DataHandler
-from src.base import Evaluator, Sentence, DataPoint, OneHotEncoding
+from src.base import Evaluator, Sentence, DataPoint, OneHotEncoding, plotDevAccuracy, plotTrainLoss
 from src.config import ANNConfig as Config
 
 from alive_progress import alive_bar
@@ -142,8 +142,8 @@ class FeedForwardNeuralNetworkDataHandler(DataHandler) :
 
 class FeedForwardNeuralNetwork(nn.Module, Model) :
     def __init__(self, modelName : str, previousContextSize : int = Config.previousContextSize, 
-                 futureContextSize : int = Config.futureContextSize, numHiddenLayers : int = Config.hiddenLayers.__len__(), 
-                 hiddenLayerSize : list = Config.hiddenLayers, device = None, startOver = False) :
+                 futureContextSize : int = Config.futureContextSize, 
+                 hiddenLayerSize : list = Config.hiddenLayers, device = None, startOver = False, batchSize : int = Config.miniBatchSize) :
         
         if device is None :
             device = 'cuda'
@@ -153,18 +153,17 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
         
         self.previousContextSize = previousContextSize
         self.futureContextSize = futureContextSize
-        
-        self.numHiddenLayers = numHiddenLayers
+        self.batchSize = batchSize
         self.hiddenLayerSize = hiddenLayerSize
-
+        self.numHiddenLayers = len(self.hiddenLayerSize)
+        
         self.numClasses = len(Config.classLabels)
         self.inputSize = EmbeddingSize*(self.previousContextSize + self.futureContextSize + 1)
-
         self.modelLoss = []
         self.modelAccuracyDev = []
         
-        modelName += f"_p={previousContextSize}_s={futureContextSize}_n={numHiddenLayers}"
-        for i in range(numHiddenLayers) :
+        modelName += f"_p={previousContextSize}_s={futureContextSize}_n={self.numHiddenLayers}"
+        for i in range(self.numHiddenLayers) :
             modelName += f"_{hiddenLayerSize[i]}"
 
         Model.__init__(self,modelName=modelName)
@@ -178,7 +177,19 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             except :
                 pass
 
-        self.setNNParams()
+        self.relu = nn.ReLU()
+        self.layer = nn.ModuleList()
+        
+        for i in range (self.numHiddenLayers + 1) :
+            if i == 0 :
+                self.layer.append(nn.Linear(self.inputSize, self.hiddenLayerSize[0]))
+            elif i == self.numHiddenLayers :
+                self.layer.append(nn.Linear(self.hiddenLayerSize[-1], self.numClasses))
+            else :
+                self.layer.append(nn.Linear(self.hiddenLayerSize[i-1], self.hiddenLayerSize[i]))
+
+        self.criterion = nn.CrossEntropyLoss()
+        self.optimizer = optim.Adam(self.parameters(), lr=0.005)
         self.trained = False
         
         self.to(self.device)
@@ -189,7 +200,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
         
         for i in range (self.numHiddenLayers + 1) :
             if i == 0 :
-                self.layer.append(nn.Linear(self.inputSize, self.hiddenLayerSize[i]))
+                self.layer.append(nn.Linear(self.inputSize, self.hiddenLayerSize[0]))
             elif i == self.numHiddenLayers :
                 self.layer.append(nn.Linear(self.hiddenLayerSize[-1], self.numClasses))
             else :
@@ -197,8 +208,6 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
 
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.parameters(), lr=0.005)
-        self.to(self.device)
-
 
     def forward(self, x):
         for i in range(self.numHiddenLayers + 1):
@@ -224,7 +233,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                         outputs = self(inputs)
 
                         loss = self.criterion(outputs, labels)
-
+                        
                         self.optimizer.zero_grad()
                         loss.backward()
                         self.optimizer.step()
@@ -238,9 +247,8 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                 self.modelLoss.append(avg_loss)
                 print(f'Epoch [{epoch+1}/{numEpochs}], Average Loss: {avg_loss:.4f}')
 
-                if epoch > 0 and epoch % Config.validationFrequency == 1 :
-                    validationMetric = self.evaluateModel(validation = True)
-                    self.modelAccuracyDev.append(validationMetric)
+                validationMetric = self.evaluateModel(validation = True)
+                self.modelAccuracyDev.append(validationMetric)
 
             print('Training completed successfully')
             self.trained = True
@@ -262,28 +270,30 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             batchSize = 0
             allPredictions = []
             allActuals = []
+            
+            with torch.no_grad() :
+                with alive_bar(len(data)) as bar:
+                    for X,Y in data :
+                        if batchSize == 0 :
+                            batchSize = X.shape[0]
+                        X, Y = X.to(self.device), Y.to(self.device)
+                        outputs = self(X)
 
-            with alive_bar(len(data)) as bar:
-                for X,Y in data :
-                    if batchSize == 0 :
-                        batchSize = X.shape[0]
-                    X, Y = X.to(self.device), Y.to(self.device)
-                    outputs = self(X)
+                        predicted = torch.argmax(outputs, dim = 1)
+                        actual = torch.argmax(Y, dim = 1)
+                        
 
-                    predicted = torch.argmax(outputs, dim = 1)
-                    actual = torch.argmax(Y, dim = 1)
-                    
+                        allPredictions.extend([Config.classes[predictedValue] for predictedValue in predicted.flatten().tolist()])
+                        allActuals.extend([Config.classes[actualValue] for actualValue in actual.flatten().tolist()])
 
-                    allPredictions.extend([Config.classes[predictedValue] for predictedValue in predicted.flatten().tolist()])
-                    allActuals.extend([Config.classes[actualValue] for actualValue in actual.flatten().tolist()])
-
-                    accuracy += (predicted == actual).sum().item()
-                    bar()
+                        accuracy += (predicted == actual).sum().item()
+                        bar()
             
             evaluation = Evaluator(allPredictions, allActuals)
             
             print(evaluation())
-            # evaluation.plot_confusion_matrix()
+            if data == self.testData :
+                evaluation.plot_confusion_matrix(fileName = self.modelName)
             return evaluation
         except Exception as e:
             import traceback
@@ -293,13 +303,16 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
     def completeEvaluation(self):
         try:
             results = {}
-            results['Train'] = self.evaluateModel()
+            # results['Train'] = self.evaluateModel()
             results['Validation'] = self.evaluateModel(validation = True)
             results['Test'] = self.evaluateModel(test = True)
+            
+            plotDevAccuracy(fileName = self.modelName, devAccuracy = self.modelAccuracyDev)
+            plotTrainLoss(trainLoss = self.modelLoss, fileName = self.modelName)
 
             return results
         except Exception as e:
-            print(e)
+            raise(e)
             return {}
     
     def prepareData(self):
@@ -307,16 +320,16 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             if hasattr(self, 'dataHandler') :
                 return 1
 
-            self.dataHandler = FeedForwardNeuralNetworkDataHandler("en_atis-ud")
+            self.dataHandler = FeedForwardNeuralNetworkDataHandler("en_atis-ud", previousContextSize=self.previousContextSize, futureContextSize=self.futureContextSize)
             self.dataHandler.getDataPoints()
             
             self.trainDataSet = FeedForwardNeuralNetworkDataset(self.dataHandler.trainDataPoints)
             self.testDataSet = FeedForwardNeuralNetworkDataset(self.dataHandler.testDataPoints)
             self.validationDataSet = FeedForwardNeuralNetworkDataset(self.dataHandler.validationDataPoints)
 
-            self.trainData = DataLoader(self.trainDataSet, batch_size=Config.miniBatchSize, shuffle=True)
-            self.testData = DataLoader(self.testDataSet, batch_size=Config.miniBatchSize, shuffle=False)
-            self.validationData = DataLoader(self.validationDataSet, batch_size=Config.miniBatchSize, shuffle=False)
+            self.trainData = DataLoader(self.trainDataSet, batch_size=self.batchSize, shuffle=True)
+            self.testData = DataLoader(self.testDataSet, batch_size=self.batchSize, shuffle=False)
+            self.validationData = DataLoader(self.validationDataSet, batch_size=self.batchSize, shuffle=False)
         except Exception as e:
             print(e)
             return

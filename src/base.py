@@ -3,6 +3,8 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
 
+from src.config import Config
+
 class Color :
     PURPLE = '\033[95m'
     CYAN = '\033[96m'
@@ -57,7 +59,7 @@ class Evaluator :
         average = "weighted" if average is None else average
         return recall_score(self.groundTruth, self.prediction, average = average, zero_division=0.0)
 
-    def plot_confusion_matrix(self, normalize = False, fileName : str = "Model", showPlot : bool = True ):
+    def plot_confusion_matrix(self, normalize = False, fileName : str = "Model", showPlot : bool = False ):
         try :
             cm = self.getConfusionMatrix()
             fmt = 'd'
@@ -66,7 +68,7 @@ class Evaluator :
                 cm = cm.astype('float') / (cm.sum(axis=1)[:, np.newaxis]*(0.001))
                 fmt = '.2f'  # Format for displaying normalized values
 
-            plt.figure(figsize=(10, 8))
+            fig = plt.figure(figsize=(10, 8))
 
             uniqueLabels = np.unique(self.groundTruth + self.prediction)
             classLabels = [label for label in uniqueLabels]
@@ -75,9 +77,10 @@ class Evaluator :
             plt.xlabel('Predicted Labels')
             plt.ylabel('True Labels')
             plt.title('Confusion Matrix')
-            plt.savefig(f'Confusion Matrix for {fileName}.png')
+            plt.savefig(f'{Config.plotSavePath}CM_{fileName}.svg', bbox_inches='tight')
             if showPlot :
                 plt.show()
+            plt.close(fig)
         except RuntimeError as e :
             print(e)
 
@@ -90,7 +93,6 @@ class Evaluator :
         }
         
         return metrics
-     
     
 class DataPoint :
     def __init__(self, dataPoint):
@@ -107,3 +109,21 @@ def OneHotEncoding(totalSize, index) :
     else :
         print("Error in OneHotEncoding function")
     return oneHotEncoding
+
+def plotDevAccuracy(devAccuracy : list, fileName : str = "Model") :
+    devAccuracy = [ met()['Accuracy']*100 for met in devAccuracy ]
+    fig = plt.figure()
+    plt.plot(devAccuracy)
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.savefig(f'{Config.plotSavePath}DevAccuracy_{fileName}.svg', bbox_inches='tight')
+    plt.close(fig)
+
+def plotTrainLoss(trainLoss : list, fileName : str = "Model") :
+    fig = plt.figure()
+    plt.plot(trainLoss)
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.savefig(f'{Config.plotSavePath}TrainLoss_{fileName}.svg', bbox_inches='tight')
+    plt.close(fig)
+

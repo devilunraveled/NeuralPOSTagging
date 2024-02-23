@@ -20,10 +20,10 @@ class Config :
     epochs = 10
     
     ## ========================= Mini Batch Size =========================
-    miniBatchSize = 8
+    miniBatchSize = 64
     
     ## ========================= Validation Frequency =========================
-    validationFrequency = 3
+    validationFrequency = 1
     
     ## ========================= MLP Size =========================
     hiddenLayers = [64, 64]
