@@ -1,0 +1,22 @@
+\section*{Recurrent Neural Networks}
+
+\subsection*{Data Preparation}
+Data preparation is a bit simpler for the case of \verb|RNN|. Each datapoint is simply a sentence. To take into account the difference in the sentence lengths, I pad each sentence to the size of the maximum length sentence using the \verb|pad_sequence| function from the library \verb|torch|.
+
+\subsection*{Training}
+The following paramters are being tuned and changed in the model. For anyone who is new to RNNs, the outputs of RNN are interpreted through the \verb|hiddenState| at each time step, where a time step is just a token index. So, the output of the RNN is a matrix that contains the information regarding the \verb|hiddenState| at each of the time-steps. To actually perform any downstream task, like POS tagging in this case, we pass these output hiddenStates from the model, to a few MLP layers in order to perform the task.
+
+\begin{itemize}
+    \item \textbf{Learning Rate}
+    \item \textbf{Batch Size}
+    \item \textbf{Stack Size}
+    \item \textbf{Hidden State Size}
+    \item \textbf{Number of layers in the MLP}
+    \item \textbf{Epochs}
+\end{itemize}
+
+\subsection*{Bidirectional RNN}
+You can pass Bidirectionality as a boolean to the \verb|ReccurentNeuralLayer| model, in order to train and save a bidirectional RNN.
+
+\subsection*{Testing}
+The model is evaluated on the \verb|dev| and \verb|test| datasets. The data for evaluation is prepared in a similar way, but the padding is ignored for the batch, to calculate the model metrics precisely. The inference is performed without the padding since the entire input is treated as a single sentence.

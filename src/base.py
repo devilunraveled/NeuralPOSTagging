@@ -57,7 +57,7 @@ class Evaluator :
         average = "weighted" if average is None else average
         return recall_score(self.groundTruth, self.prediction, average = average, zero_division=0.0)
 
-    def plot_confusion_matrix(self, normalize = False):
+    def plot_confusion_matrix(self, normalize = False, fileName : str = "Model", showPlot : bool = True ):
         try :
             cm = self.getConfusionMatrix()
             fmt = 'd'
@@ -75,7 +75,9 @@ class Evaluator :
             plt.xlabel('Predicted Labels')
             plt.ylabel('True Labels')
             plt.title('Confusion Matrix')
-            plt.show()
+            plt.savefig(f'Confusion Matrix for {fileName}.png')
+            if showPlot :
+                plt.show()
         except RuntimeError as e :
             print(e)
 

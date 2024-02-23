@@ -7,13 +7,12 @@ from src.config import Config
 
 class Model :
     def __init__(self, modelName = None) :
+        self.savePlots = False
         self.modelName = "Model" if modelName is None else modelName
         self.modelFileName = Config.modelSavePath + self.modelName
         self.modelFileName += f"_EPOCHS={Config.epochs}"
         self.modelFileName += f"_BATCH_SIZE={Config.miniBatchSize}"
         self.modelFileName += Config.modelFileExtension
-    def test(self) :
-        pass
     
     def saveModel(self):
         try :
@@ -31,7 +30,23 @@ class Model :
             return 1
         except :
             return -1
+    
+    def trainModel(self, numEpochs = Config.epochs):
+        try :
+            return 1
+        except :
+            return None
+    def setModelName(self, name : str):
+        self.modelName = name
 
-    # Evaluation Related Functionality
-    def getEvaluationResults(self) :
-        pass
+    def setParams(self, **parameters):
+        try :
+            for parameter, value in parameters.items():
+                setattr(self, parameter, value)
+            return self
+        except Exception as e:
+            print(e)
+            return self
+
+    def completeEvaluation(self) :
+        return {}

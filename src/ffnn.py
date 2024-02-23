@@ -143,10 +143,13 @@ class FeedForwardNeuralNetworkDataHandler(DataHandler) :
 class FeedForwardNeuralNetwork(nn.Module, Model) :
     def __init__(self, modelName : str, previousContextSize : int = Config.previousContextSize, 
                  futureContextSize : int = Config.futureContextSize, numHiddenLayers : int = Config.hiddenLayers.__len__(), 
-                 hiddenLayerSize : list = Config.hiddenLayers, device = torch.device('cpu'), startOver = False) :
+                 hiddenLayerSize : list = Config.hiddenLayers, device = None, startOver = False) :
         
-        self.device = device
-        print(f"Using {self.device}")
+        if device is None :
+            device = 'cuda'
+
+        self.device = torch.device(device)
+        print(f"Using {self.device} for FFNN.")
         
         self.previousContextSize = previousContextSize
         self.futureContextSize = futureContextSize
@@ -157,6 +160,8 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
         self.numClasses = len(Config.classLabels)
         self.inputSize = EmbeddingSize*(self.previousContextSize + self.futureContextSize + 1)
 
+        self.modelLoss = []
+        self.modelAccuracyDev = []
         
         modelName += f"_p={previousContextSize}_s={futureContextSize}_n={numHiddenLayers}"
         for i in range(numHiddenLayers) :
@@ -173,7 +178,12 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             except :
                 pass
 
-
+        self.setNNParams()
+        self.trained = False
+        
+        self.to(self.device)
+    
+    def setNNParams(self):
         self.relu = nn.ReLU()
         self.layer = nn.ModuleList()
         
@@ -187,10 +197,8 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
 
         self.criterion = nn.CrossEntropyLoss()
         self.optimizer = optim.Adam(self.parameters(), lr=0.005)
-
-        self.trained = False
-        
         self.to(self.device)
+
 
     def forward(self, x):
         for i in range(self.numHiddenLayers + 1):
@@ -199,7 +207,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                 x = self.relu(x)
         return x
 
-    def trainModel(self, numEpochs):
+    def trainModel(self, numEpochs = Config.epochs):
         try:
             if self.trained :
                 return 
@@ -214,6 +222,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                         inputs, labels = inputs.to(self.device), labels.to(self.device)
                         # Forward pass
                         outputs = self(inputs)
+
                         loss = self.criterion(outputs, labels)
 
                         self.optimizer.zero_grad()
@@ -226,10 +235,12 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
                 
                 # Print average loss for the epoch
                 avg_loss = runningLoss / len(self.trainData)
+                self.modelLoss.append(avg_loss)
                 print(f'Epoch [{epoch+1}/{numEpochs}], Average Loss: {avg_loss:.4f}')
 
                 if epoch > 0 and epoch % Config.validationFrequency == 1 :
-                    self.evaluateModel(validation = True)
+                    validationMetric = self.evaluateModel(validation = True)
+                    self.modelAccuracyDev.append(validationMetric)
 
             print('Training completed successfully')
             self.trained = True
@@ -278,7 +289,7 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
             import traceback
             print(traceback.format_exc())
             raise(e)
-    
+   
     def completeEvaluation(self):
         try:
             results = {}
@@ -349,7 +360,8 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
 
         except Exception as e:
             raise(e)
-            return {}
+
+
 if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = FeedForwardNeuralNetwork("SimpleANN", device = device)

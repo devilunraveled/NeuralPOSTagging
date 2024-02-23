@@ -1,0 +1,19 @@
+\section*{Feed Forward Neural Network}
+
+\subsection*{Data Preparation}
+The data is is prepared, by first padding each sentence adequately, based on context window sizes. Thereafter, \verb|dataPoints| are created for the model, based on the context window. The embedding size can be adjusted simply by adding another layer, so we can pass the model the \verb|one-Hot| vectors and expect it to learn the embeddings for the tokens in the first token itself. Note that this is a bit different because the model is allowed to have interaction with other tokens.
+
+\subsection*{Training}
+The model is trained on the training dataset using a variety of parameters tuned. I have accounted for changes in : \footnote{The paramaters can be passed to the model, the default values are present in config.py file.}
+
+\begin{itemize}
+    \item \textbf{Learning Rate}
+    \item \textbf{Batch Size}
+    \item \textbf{Number of layers in the ANN}
+    \item \textbf{Context window}
+\end{itemize}
+
+For the sake of completeness, I have also accounted for assymteric context windows.
+
+\subsection*{Testing}
+The model is evaluated on the \verb|dev| and \verb|test| datasets. The data for evaluation and inference is prepared in a similar way
