@@ -9,17 +9,20 @@ class PerformanceEvaluation:
 
     def runEvaluations(self) -> None:
         for params in self.parameters :
-            model = ReccurentNeuralNetwork(**params)
+            model = FeedForwardNeuralNetwork(**params)
             self.models.append(model)
             model.prepareData()
             model.trainModel()
-            self.evaluations[model.modelName] = model.completeEvaluation()
+            # self.evaluations[model.modelName] = model.completeEvaluation()
+    
+    def chooseTopN(self, n : int = 3) -> dict:
+        return self.evaluations
 
 def getParamsFFNN():
     params = []
     
-    possibleS = [0,1,2,3,4]
-    possibleP = [0,1,2,3,4]
+    possibleS = [4]
+    possibleP = [3,4]
     possibleHiddenLayerSizes = [ [32], [64], [128],
                              [32, 32], [64, 64],
                              [64, 32], [128, 64],
@@ -63,8 +66,5 @@ def getParamsRNN():
     return params
 
 if __name__ == "__main__":
-    # ffnnEval = PerformanceEvaluation(getParamsFFNN())
-    # ffnnEval.runEvaluations()
-
-    rnnEval = PerformanceEvaluation(getParamsRNN())
-    rnnEval.runEvaluations()
+    ffnnEval = PerformanceEvaluation(getParamsFFNN())
+    ffnnEval.runEvaluations()

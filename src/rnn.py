@@ -285,8 +285,8 @@ class ReccurentNeuralNetwork(nn.Module, Model):
             evaluation = Evaluator(allPredictions, allActuals)
 
             print(evaluation())
-            if data == self.testData :
-                evaluation.plot_confusion_matrix(fileName = self.modelName)
+            # if data == self.testData :
+            #     evaluation.plot_confusion_matrix(fileName = self.modelName)
             return evaluation
 
         except Exception:
@@ -297,12 +297,12 @@ class ReccurentNeuralNetwork(nn.Module, Model):
     def completeEvaluation(self):
         try:
             results = {}
-            results['Train'] = self.evaluateModel()
-            results['Validation'] = self.evaluateModel(validation = True)
+            # results['Train'] = self.evaluateModel()
+            # results['Validation'] = self.evaluateModel(validation = True)
             results['Test'] = self.evaluateModel(test = True)
             
-            plotDevAccuracy(fileName = self.modelName, devAccuracy = self.modelDevAccuracy)
-            plotTrainLoss(fileName = self.modelName, trainLoss = self.modelLoss)
+            # plotDevAccuracy(fileName = self.modelName, devAccuracy = self.modelDevAccuracy)
+            # plotTrainLoss(fileName = self.modelName, trainLoss = self.modelLoss)
 
             return results
         except Exception as e:

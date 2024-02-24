@@ -304,11 +304,11 @@ class FeedForwardNeuralNetwork(nn.Module, Model) :
         try:
             results = {}
             # results['Train'] = self.evaluateModel()
-            results['Validation'] = self.evaluateModel(validation = True)
+            # results['Validation'] = self.evaluateModel(validation = True)
             results['Test'] = self.evaluateModel(test = True)
             
-            plotDevAccuracy(fileName = self.modelName, devAccuracy = self.modelAccuracyDev)
-            plotTrainLoss(trainLoss = self.modelLoss, fileName = self.modelName)
+            # plotDevAccuracy(fileName = self.modelName, devAccuracy = self.modelAccuracyDev)
+            # plotTrainLoss(trainLoss = self.modelLoss, fileName = self.modelName)
 
             return results
         except Exception as e:

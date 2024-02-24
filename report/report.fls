@@ -415,6 +415,14 @@ INPUT ./sections/Results.tex
 INPUT ./sections/Results.tex
 INPUT ./sections/Results.tex
 INPUT ./sections/Results.tex
+INPUT ./sections//../pictures/ConfusionMatrixBestFFNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestFFNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestFFNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestFFNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestRNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestRNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestRNN.png
+INPUT ./sections//../pictures/ConfusionMatrixBestRNN.png
 INPUT ./sections/Conclusion.tex
 INPUT ./sections/Conclusion.tex
 INPUT ./sections/Conclusion.tex
@@ -423,6 +431,7 @@ INPUT report.aux
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx12.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmcsc10.pfb
+INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr12.pfb
 INPUT /usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr17.pfb

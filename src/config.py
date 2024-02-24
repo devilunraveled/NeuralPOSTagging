@@ -20,7 +20,7 @@ class Config :
     epochs = 10
     
     ## ========================= Mini Batch Size =========================
-    miniBatchSize = 64
+    miniBatchSize = 16
     
     ## ========================= Validation Frequency =========================
     validationFrequency = 1

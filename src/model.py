@@ -18,7 +18,8 @@ class Model :
             pickle.dump(self, open(Config.modelSavePath + self.modelFileName + Config.modelFileExtension, "wb"))
             print(f"Model Saved at {self.modelFileName}.")
             return 1
-        except :
+        except Exception as e:
+            raise(e)
             return -1
     
     def loadModel(self):
