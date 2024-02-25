@@ -1,6 +1,6 @@
 \section*{Results}
 
-Here I discuss only the directly relevant parameters and metrics. The graphs of \verb|dev-accuracy| during training and \verb|train-loss| that are satandard and do not proide much of an insight for the given parameters, are saved in the \verb|./plots/| directory.
+Here I discuss only the directly relevant parameters and metrics. The graphs of \verb|dev-accuracy| during training and \verb|train-loss| that are satandard and do not proide much of an insight for the given parameters, are saved in the \verb|./plots/| directory. The same for the top 3 models are given at the end of the model's report.
 
 \subsection*{Feed Forward Neural Network}
 
@@ -15,7 +15,7 @@ I trained and evaluated multiple models on the \verb|en-atis| dataset. The resul
 
 % Create a table to display the above metrics :
 
-\begin{table}[h]
+\begin{table}[H]
     \centering
 \begin{tabular}{|c|c|c|c|c|c|}
 \hline
@@ -36,13 +36,32 @@ p=3 s=1 n=1 : [64] & 98.617\% & 98.6312\% & 96.8527\% & 98.617\% & 98.617\% \\
 
 The best performing model is therefore obtained for the \verb|p=2 s=1 n=1:[128]|, which is shown in the table above. It also achieves the best scores in all the other metrics the models are evaluated on.
 
-The confucsion metric for the model is given below:
+The confusion metric for the model is given below:
 
 \begin{figure}[h]
     \centering
-    \includegraphics[width=0.8\textwidth]{../pictures/ConfusionMatrixBestFFNN.png}
+    \includesvg[width=0.7\textwidth]{../pictures/ConfusionMatrixBestFFNN}
     \caption{Confusion Matrix}
 \end{figure}
+
+\subsection*{Training Plots}
+
+\newcolumntype{C}{>{\centering\arraybackslash}m{6em}}
+
+\begin{table}[H]\sffamily
+    \centering
+    \setlength{\tabcolsep}{25pt}
+    \begin{tabular}{l*4{C}@{}}
+        \toprule
+        Model & Train Loss & Dev Accuracy \\ 
+        \midrule
+        p=2,s=1,n=1:[128] & \addpic{../pictures/TrainLossBestFFNN-1} & \addpic{../pictures/ValidationBestFFNN-1} \\ 
+        p=2,s=1,n=2:[128,64] & \addpic{../pictures/TrainLossBestFFNN-2} & \addpic{../pictures/ValidationBestFFNN-2} \\ 
+        p=2,s=1,n=1:[32] & \addpic{../pictures/TrainLossBestFFNN-3} & \addpic{../pictures/ValidationBestFFNN-3} \\ 
+        \bottomrule 
+    \end{tabular}
+    \caption{Top models' Training and Validation plots}
+\end{table}
 
 \subsubsection{Remarks}
 The models simplicity in the number of layers and context window seemed to have struck a nice balance with the large size of the hidden layer to optimize its performance for the given task.
@@ -53,6 +72,7 @@ Also, the top 3 models are the same, if measured across any of these metrics, an
 \subsection*{Recurrent Neural Networks}
 
 I trained and evaluated approximately 150 models for hypereparameter tuning. The results for the top 5 models are as follows :
+\footnote{Here $s$ denotes the stack size of the RNN, $b$ denotes if the RNN is bidirectional, $h$ denotes the hidden state size, and $l$ denotes the number of layers in the classifier, followed by the layer sizes themselves.}
 
 % Model Name                                         | Accuracy | Precision | F1-macro | F1-micro | Recall    
 % EvaluationRNN-s=3_h=1_b=True_l=64_n=3_h=64_bidirec | 98.7994% | 98.836%   | 90.0127% | 98.7994% | 98.7994%
@@ -60,8 +80,7 @@ I trained and evaluated approximately 150 models for hypereparameter tuning. The
 % EvaluationRNN-s=2_h=2_b=True_l=128_n=2_h=128_bidir | 98.7234% | 98.7434%  | 96.6337% | 98.7234% | 98.7234%
 % EvaluationRNN-s=3_h=2_b=True_l=64_n=3_h=64_bidirec | 98.7082% | 98.7156%  | 97.344 % | 98.7082% | 98.7082%
 % EvaluationRNN-s=2_h=2_b=True_l=64_n=2_h=64_bidirec | 98.693%  | 98.7206%  | 89.6664% | 98.693 % | 98.693 %
-
-\begin{table}[h]
+\begin{table}[H]
 \centering
 \begin{tabular}{|l|l|l|l|l|l|}
 \hline
@@ -72,20 +91,38 @@ $s=2, b=True, h=128, l = 2 : [128, 64] $ & 98.7234   \% & 98.7434\% & 96.6337\% 
 $s=3, b=True, h=64, l = 2 : [64, 64]$ & 98.7082   \% & 98.7156\% & \textbf{97.344\%} & 98.7082\% & 98.7082\% \\ \hline
 $s=2, b=True, h=64, l = 2 : [64, 64]$ & 98.693    \% & 98.7206\% & 89.6664\% & 98.693 \% & 98.693 \% \\ \hline
 \end{tabular}
+\caption{Metrics for best-performing models.}
 \end{table}
-
-Here $s$ denotes the stack size of the RNN, $b$ denotes if the RNN is bidirectional, $h$ denotes the hidden state size, and $l$ denotes the number of layers in the classifier, followed by the layer sizes themselves.
-
-\subsubsection{Remarks}
-Similar to the FFNN models, the RNN models underwent extensive hyperparameter tuning to achieve optimal performance. Notably, the model with parameters \verb|s=3, b=True, h=64, l=1 : [64]| outperformed others in terms of accuracy and precision, albeit with a slightly lower F1-macro score compared to some other models. This is due to the class \verb|SYM| that has just a single point, predicting that incorrectly costs the model heavily.
 
 Confusion Matrix of the best performing model : 
 
-\begin{figure}[h]
+\begin{figure}[H]
 \centering
-\includegraphics[width=0.8\textwidth]{../pictures/ConfusionMatrixBestRNN.png}
+\includesvg[width=0.7\textwidth]{../pictures/ConfusionMatrixBestRNN}
 \caption{Confusion Matrix of the best performing model}
 \end{figure}
+
+
+\subsection*{Training Plots}
+
+\newcolumntype{C}{>{\centering\arraybackslash}m{6em}}
+
+\begin{table}[H]\sffamily
+    \centering
+    \setlength{\tabcolsep}{25pt}
+    \begin{tabular}{l*4{C}@{}}
+        \toprule
+        Model & Train Loss & Dev Accuracy \\ 
+        \midrule
+        $s=3, b=True, h=64, l=1 : [64]$ & \addpic{../pictures/TrainLossBestRNN-1} & \addpic{../pictures/ValidationBestRNN-1} \\ 
+        $s=2, b=True, h=64, l=2 : [128,64]$ & \addpic{../pictures/TrainLossBestRNN-2} & \addpic{../pictures/ValidationBestRNN-2} \\ 
+        $s=2, b=True, h=128, l=2 : [64,64]$ & \addpic{../pictures/TrainLossBestRNN-3} & \addpic{../pictures/ValidationBestRNN-3} \\ 
+        \bottomrule 
+    \end{tabular}
+    \caption{Top models' Training and Validation plots}
+\end{table}
+\subsubsection{Remarks}
+Similar to the FFNN models, the RNN models underwent extensive hyperparameter tuning to achieve optimal performance. Notably, the model with parameters \verb|s=3, b=True, h=64, l=1 : [64]| outperformed others in terms of accuracy and precision, albeit with a slightly lower F1-macro score compared to some other models. This is due to the class \verb|SYM| that has just a couple of points, predicting them incorrectly costs the model heavily.
 
 The bidirectional nature of certain models ($b=True$) seems to contribute positively to their performance, especially when combined with larger hidden state sizes. However, it's crucial to note that in some cases, increasing the complexity of the model (such as adding more layers or increasing hidden state sizes) did not necessarily lead to improved performance across all metrics.
 

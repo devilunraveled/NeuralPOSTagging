@@ -20,3 +20,5 @@ You can pass Bidirectionality as a boolean to the \verb|ReccurentNeuralLayer| mo
 
 \subsection*{Testing}
 The model is evaluated on the \verb|dev| and \verb|test| datasets. The data for evaluation is prepared in a similar way, but the padding is ignored for the batch, to calculate the model metrics precisely. The inference is performed without the padding since the entire input is treated as a single sentence.
+
+A key implementation observation is that the training time for RNNs is less compared to that of ANNs, but increasing the bath size results in deteorated performances due to padding.
